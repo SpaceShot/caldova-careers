@@ -10,7 +10,13 @@ export const prerender = true;
 
 const entries = await getCollection('jobs');
 const jobs: Job[] = sortByNewest(
-    entries.map((entry) => ({ slug: entry.id, ...entry.data })),
+  entries.map((entry) => ({ slug: entry.id, ...entry.data })),
+);
+const departments = [...new Set(jobs.map((job) => job.department))].sort((a, b) =>
+  a.localeCompare(b),
+);
+const locations = [...new Set(jobs.map((job) => job.location))].sort((a, b) =>
+  a.localeCompare(b),
 );
 ---
 
@@ -29,12 +35,158 @@ const jobs: Job[] = sortByNewest(
     {jobs.length === 0 ? (
       <EmptyState text="There are no open roles right now. Check back soon." />
     ) : (
-      <div
-        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
-        data-testid="roles-grid"
-      >
-        {jobs.map((job) => <RoleCard job={job} />)}
-      </div>
+      <>
+        <div
+          class="mb-6 grid grid-cols-1 gap-4 rounded-xl border border-slate-700 bg-slate-800/50 p-4 sm:grid-cols-3"
+          data-testid="role-filters"
+          data-jobs={JSON.stringify(jobs)}
+        >
+          <div>
+            <label for="department-filter" class="mb-2 block text-sm font-medium text-slate-200">
+              Department
+            </label>
+            <select
+              id="department-filter"
+              class="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+              data-testid="department-filter"
+            >
+              <option value="">All departments</option>
+              {departments.map((department) => <option value={department}>{department}</option>)}
+            </select>
+          </div>
+          <div>
+            <label for="location-filter" class="mb-2 block text-sm font-medium text-slate-200">
+              Location
+            </label>
+            <select
+              id="location-filter"
+              class="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+              data-testid="location-filter"
+            >
+              <option value="">All locations</option>
+              {locations.map((location) => <option value={location}>{location}</option>)}
+            </select>
+          </div>
+          <div class="flex items-end">
+            <button
+              type="button"
+              class="w-full rounded-lg border border-slate-500 px-4 py-2 font-medium text-slate-100 hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+              data-testid="reset-filters"
+            >
+              Clear filters
+            </button>
+          </div>
+        </div>
+
+        <p class="mb-4 text-sm text-slate-400" aria-live="polite" data-testid="filter-results-count">
+          Showing {jobs.length} roles
+        </p>
+
+        <div
+          class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+          data-testid="roles-grid"
+        >
+          {jobs.map((job) => <RoleCard job={job} />)}
+        </div>
+
+        <div hidden data-testid="filtered-empty-state">
+          <EmptyState text="No roles match these filters. Try changing or clearing your filters." />
+        </div>
+      </>
     )}
   </div>
 </Layout>
+
+<script>
+  import { filterJobs } from '../lib/jobs';
+  import type { Job } from '../types/job';
+
+  /** Attach client-side filtering behavior to the rendered role list. */
+  function initializeRoleFilters(): void {
+    const filterPanel = document.querySelector<HTMLElement>('[data-testid="role-filters"]');
+    const rolesGrid = document.querySelector<HTMLElement>('[data-testid="roles-grid"]');
+    const departmentFilter = document.querySelector<HTMLSelectElement>(
+      '[data-testid="department-filter"]',
+    );
+    const locationFilter = document.querySelector<HTMLSelectElement>(
+      '[data-testid="location-filter"]',
+    );
+    const resetFilters = document.querySelector<HTMLButtonElement>(
+      '[data-testid="reset-filters"]',
+    );
+    const resultCount = document.querySelector<HTMLElement>(
+      '[data-testid="filter-results-count"]',
+    );
+    const emptyState = document.querySelector<HTMLElement>(
+      '[data-testid="filtered-empty-state"]',
+    );
+
+    if (
+      !filterPanel &&
+      !rolesGrid &&
+      !departmentFilter &&
+      !locationFilter &&
+      !resetFilters &&
+      !resultCount &&
+      !emptyState
+    ) {
+      return;
+    }
+    if (
+      !filterPanel ||
+      !rolesGrid ||
+      !departmentFilter ||
+      !locationFilter ||
+      !resetFilters ||
+      !resultCount ||
+      !emptyState
+    ) {
+      throw new Error('The role filter controls could not be initialized.');
+    }
+
+    const activeDepartmentFilter = departmentFilter;
+    const activeLocationFilter = locationFilter;
+    const activeResetFilters = resetFilters;
+    const activeResultCount = resultCount;
+    const activeEmptyState = emptyState;
+    const jobsData = filterPanel.dataset.jobs;
+    if (!jobsData) {
+      throw new Error('The role filter data is missing.');
+    }
+    const jobs: Job[] = JSON.parse(jobsData);
+    const cards = [...rolesGrid.querySelectorAll<HTMLElement>('[data-job-id]')];
+
+    /** Update visible role cards and announce the result count. */
+    function updateResults(): void {
+      const matchingSlugs = new Set(
+        filterJobs(jobs, {
+          department: activeDepartmentFilter.value,
+          location: activeLocationFilter.value,
+        }).map((job) => job.slug),
+      );
+      let visibleCount = 0;
+
+      for (const card of cards) {
+        const isVisible = matchingSlugs.has(card.dataset.jobId ?? '');
+        card.hidden = !isVisible;
+        if (isVisible) {
+          visibleCount += 1;
+        }
+      }
+
+      activeResultCount.textContent =
+        `Showing ${visibleCount} ${visibleCount === 1 ? 'role' : 'roles'}`;
+      activeEmptyState.hidden = visibleCount > 0;
+    }
+
+    activeDepartmentFilter.addEventListener('change', updateResults);
+    activeLocationFilter.addEventListener('change', updateResults);
+    activeResetFilters.addEventListener('click', () => {
+      activeDepartmentFilter.value = '';
+      activeLocationFilter.value = '';
+      updateResults();
+    });
+  }
+
+  initializeRoleFilters();
+</script>
