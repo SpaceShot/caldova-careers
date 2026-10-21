@@ -68,9 +68,9 @@ This repository is a GitHub template. When you create a new repository from it, 
 
 The workflow only runs on repositories created from the template (the `if: ${{ !github.event.repository.is_template }}` guard skips the template itself), and after creating the issues it removes itself and the `.github/bootstrap-issues/` folder in a cleanup commit so it never runs again.
 
-The starter retains location data on job postings and uses it on role cards and detail pages. The **Filter roles by department and location** issue (`workshop:filtering`) adds accessible department and location filters to the listing. Other workshop exercises include documenting new TypeScript with TSDoc, updating the `quality-checks` skill, and creating `.github/agents/qa.agent.md`.
+The starter retains location data on job postings and uses it on role cards and detail pages. The **Filter roles by department and location** issue (`workshop:filtering`) adds accessible department and location filters to the listing. Repository guidance now documents TSDoc conventions, the `quality-checks` skill describes its results format, and `.github/agents/qa.agent.md` provides a feature-verification workflow.
 
-The only bundled skill is `.github/skills/quality-checks/SKILL.md`. The starter includes no custom agents or MCP server configuration: learners configure Playwright MCP in Copilot CLI and create the QA agent during the workshop. GitHub MCP is built into Copilot CLI and needs no repository server configuration.
+The bundled skill is `.github/skills/quality-checks/SKILL.md`, and the repository includes a QA custom agent in `.github/agents/qa.agent.md`. The starter includes no MCP server configuration: learners configure Playwright MCP in Copilot CLI during the workshop. GitHub MCP is built into Copilot CLI and needs no repository server configuration.
 
 The `quality-checks` skill runs lint, type checking, and unit tests only, even for a general request to run tests and linters. Playwright E2E tests remain available separately and run in CI; browser observation with Playwright MCP is a later workshop exercise.
 
